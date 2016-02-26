@@ -13,6 +13,7 @@
 // and display as many instances of this form as we wish within our user 
 // interface.
 
+"use strict";
 function EmailFormView() {
 	// Create new DOM elements to represent the form we are creating (you may wish
 	// to store the HTML tags you need directly within your page rather than create
@@ -238,24 +239,152 @@ function BargraphView() {
 
 BargraphView.prototype = {
 	// All Views should have a render() method, which is called by the controller
-	// at some point after its instantiation by the controller. It would typically
-	// be passed the data from the Model also, though in this particular case we
-	// do not need that data.
+	// at some point after its instantiation by the controller. It receives
+	// the data from the Model.
 	render: function(modelData) {
-		console.log('Bargraph View render');
+		console.log(modelData);
 		// Nest the input field and button tag within the form tag.
 		this.chartDiv.appendChild(this.button);
 		// Add the form to the bottom of the html page.
 		document.body.appendChild(this.chartDiv);
+	    // Data Generation Functions
+        // -------------------------
 
+        // Compute a random interval using an Exponential Distribution of
+        // parameter lambda = (1 / avgSeconds).
+        function randomInterval(avgSeconds) {
+            return Math.floor(-Math.log(Math.random()) * 1000 * avgSeconds);
+        };
+
+        // Create or extend an array of increasing dates by adding a random
+        // time interval using an exponential distribution.
+        function addData(data, numItems, avgSeconds) {
+            // Compute the most recent time in the data array. If the array is
+            // empty, uses the current time.
+            var n = data.length,
+                t = (n > 0) ? data[n - 1].date : new Date();
+
+            // Append items with increasing times in the data array.
+            for (var k = 0; k < numItems - 1; k += 1) {
+                t = new Date(t.getTime() + randomInterval(avgSeconds));
+                data.push({date: t});
+            }
+
+            return data;
+        }
+
+        //  Generate a random dataset with dates.
+        var data = addData([], 150, 300);
+        
+		// OK to here.
+
+		// Closure to create a private scope for the charting function. I believe that the closure is the chart
+        // function, which uses variables in its outer scope.
+		var barcodeChart5 = function() {
+	
+			// Chart variables
+			var width = 600,
+				height = 30,
+				margin = {top: 5, right: 5, bottom: 5, left: 5};
+	
+			var value = function(d) { return d.date; };
+	
+			function chart(selection) {
+				selection.each(function(data) {
+	
+					// Bind the dataset to the svg selection.
+					var div = d3.select(this),
+						svg = div.selectAll('svg').data([data]);
+	
+					// SVG Initialization.
+					svg.enter().append('svg').call(svgInit);
+	
+					// Compute the horizontal scale.
+					var xScale = d3.time.scale()
+						.domain(d3.extent(data, value))
+						.range([0, width - margin.left - margin.right]);
+	
+					// Select the chart group.
+					var g = svg.select('g.chart-content');
+	
+					// Bind the data to the bars selection.
+					var bars = g.selectAll('line').data(data, value);
+	
+					// Create the bars on enter and set their attributes.
+					bars.enter().append('line')
+						.attr('x1', function(d) { return xScale(value(d)); })
+						.attr('x2', function(d) { return xScale(value(d)); })
+						.attr('y1', 0)
+						.attr('y2', height - margin.top - margin.bottom)
+						.attr('stroke', '#000')
+						.attr('stroke-opacity', 0.5);
+				});
+			}
+	
+			// Initialize the SVG Element
+			function svgInit(svg) {
+				// Set the SVG size
+				svg
+					.attr('width', width)
+					.attr('height', height);
+	
+				// Create and translate the container group
+				var g = svg.append('g')
+					.attr('class', 'chart-content')
+					.attr('transform', 'translate(' + [margin.top, margin.left] + ')');
+	
+				// Add a background rectangle
+				g.append('rect')
+					.attr('width', width - margin.left - margin.right)
+					.attr('height', height - margin.top - margin.bottom)
+					.attr('fill', 'white');
+			};
+	
+			// Accessor Methods
+	
+			// Width
+			chart.width = function(value) {
+				if (!arguments.length) { return width; }
+				width = value;
+				return chart;
+			};
+	
+			// Height
+			chart.height = function(value) {
+				if (!arguments.length) { return height; }
+				height = value;
+				return chart;
+			};
+	
+			// Margin
+			chart.margin = function(value) {
+				if (!arguments.length) { return margin; }
+				margin = value;
+				return chart;
+			};
+	
+			// Date Accessor Method
+			chart.value = function(accessorFunction) {
+				if (!arguments.length) { return value; }
+				value = accessorFunction;
+				return chart;
+			};
+	
+			return chart;
+		};
+		
+		// Get the charting function and set the date accessor function.
+		var barcode05 = barcodeChart5()
+			.value(function(d) { return d.date; });
+	
+		// Create the selection, bind the data and call the chart.
 		d3.select('#chart').selectAll('div.data-item')
-			.data(modelData)
+			.data([data])
 			.enter()
 			.append('div')
 			.attr('class', 'data-item')
-			.append('p')
-			.html(function(d) {return d;});
-		
+			.call(barcode05);		
+
 		// Connect up any events to the DOM elements represented in this View.
 		this.bindEvents();
 	},
