@@ -242,11 +242,25 @@ BargraphView.prototype = {
 	// at some point after its instantiation by the controller. It receives
 	// the data from the Model.
 	render: function(modelData) {
-		console.log(modelData);
+		function findElement(id) {
+            var elem = document.getElementById(id);
+            if(!elem){
+    	        throw new ElementNotFoundError(id);
+            }
+            return elem;
+        }
 		// Nest the input field and button tag within the form tag.
 		this.chartDiv.appendChild(this.button);
 		// Add the form to the bottom of the html page.
 		document.body.appendChild(this.chartDiv);
+	    try{
+			findElement("chart");
+		} catch(error) {
+			if(error instanceof ElementNotFoundError) {
+				console.log('Sorry the element was nooot found')
+			}
+		}
+		
 	    // Data Generation Functions
         // -------------------------
 
