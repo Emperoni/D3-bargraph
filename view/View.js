@@ -242,6 +242,7 @@ BargraphView.prototype = {
 	// at some point after its instantiation by the controller. It receives
 	// the data from the Model.
 	render: function(modelData) {
+		// Sample code for initial custom error handling.
 		function findElement(id) {
             var elem = document.getElementById(id);
             if(!elem){
@@ -253,6 +254,7 @@ BargraphView.prototype = {
 		this.chartDiv.appendChild(this.button);
 		// Add the form to the bottom of the html page.
 		document.body.appendChild(this.chartDiv);
+		// see if the chart element exists, if not show an error.
 	    try{
 			findElement("chart");
 		} catch(error) {
@@ -288,116 +290,201 @@ BargraphView.prototype = {
         }
 
         //  Generate a random dataset with dates.
-        var data = addData([], 150, 300);
-        
-		// OK to here.
+            var data = [
+              {name: 'AAPL', mentions: addData([], 850,  2 * 60), byHour: 34.3},
+              {name: 'MSFT', mentions: addData([], 800,  5 * 60), byHour: 11.1},
+              {name: 'GOOG', mentions: addData([], 630,  3 * 60), byHour: 19.2},
+              {name: 'NFLX', mentions: addData([], 310, 10 * 60), byHour:  6.7}
+            ];
 
-		// Closure to create a private scope for the charting function. I believe that the closure is the chart
-        // function, which uses variables in its outer scope.
-		var barcodeChart5 = function() {
-	
-			// Chart variables
-			var width = 600,
-				height = 30,
-				margin = {top: 5, right: 5, bottom: 5, left: 5};
-	
-			var value = function(d) { return d.date; };
-	
-			function chart(selection) {
-				selection.each(function(data) {
-	
-					// Bind the dataset to the svg selection.
-					var div = d3.select(this),
-						svg = div.selectAll('svg').data([data]);
-	
-					// SVG Initialization.
-					svg.enter().append('svg').call(svgInit);
-	
-					// Compute the horizontal scale.
-					var xScale = d3.time.scale()
-						.domain(d3.extent(data, value))
-						.range([0, width - margin.left - margin.right]);
-	
-					// Select the chart group.
-					var g = svg.select('g.chart-content');
-	
-					// Bind the data to the bars selection.
-					var bars = g.selectAll('line').data(data, value);
-	
-					// Create the bars on enter and set their attributes.
-					bars.enter().append('line')
-						.attr('x1', function(d) { return xScale(value(d)); })
-						.attr('x2', function(d) { return xScale(value(d)); })
-						.attr('y1', 0)
-						.attr('y2', height - margin.top - margin.bottom)
-						.attr('stroke', '#000')
-						.attr('stroke-opacity', 0.5);
-				});
-			}
-	
-			// Initialize the SVG Element
-			function svgInit(svg) {
-				// Set the SVG size
-				svg
-					.attr('width', width)
-					.attr('height', height);
-	
-				// Create and translate the container group
-				var g = svg.append('g')
-					.attr('class', 'chart-content')
-					.attr('transform', 'translate(' + [margin.top, margin.left] + ')');
-	
-				// Add a background rectangle
-				g.append('rect')
-					.attr('width', width - margin.left - margin.right)
-					.attr('height', height - margin.top - margin.bottom)
-					.attr('fill', 'white');
-			};
-	
-			// Accessor Methods
-	
-			// Width
-			chart.width = function(value) {
-				if (!arguments.length) { return width; }
-				width = value;
-				return chart;
-			};
-	
-			// Height
-			chart.height = function(value) {
-				if (!arguments.length) { return height; }
-				height = value;
-				return chart;
-			};
-	
-			// Margin
-			chart.margin = function(value) {
-				if (!arguments.length) { return margin; }
-				margin = value;
-				return chart;
-			};
-	
-			// Date Accessor Method
-			chart.value = function(accessorFunction) {
-				if (!arguments.length) { return value; }
-				value = accessorFunction;
-				return chart;
-			};
-	
-			return chart;
+		var barcodeChart = function() {
+		    'use strict';
+
+		    // Chart variables
+		    var width = 600,
+		        height = 30,
+		        margin = {top: 5, right: 5, bottom: 5, left: 5};
+
+		    // Date accessor function
+		    var value = function(d) { return d.date; };
+
+		    // Barcode chart time interval
+		    var timeInterval = d3.time.day;
+
+		    function chart(selection) {
+		        selection.each(function(data) {
+
+		            // Select the SVG elements and bind it to a single element dataset.
+		            var div = d3.select(this),
+		                svg = div.selectAll('svg').data([data]);
+
+		            // Append the SVG on enter.
+		            svg.enter().append('svg')
+		                .call(chart.svgInit);
+
+		            // Select the chart group.
+		            var g = svg.select('g.chart-content'),
+		                lines = g.selectAll('line');
+
+		            // Compute the most recent date of the dataset.
+		            var lastDate = d3.max(data, value);
+
+		            // Compute the most recent date of the data items binded to the bars.
+		            if (!lines.empty()) {
+		                lastDate = d3.max(lines.data(), value);
+		            }
+
+		            // Compute the horizontal scale.
+		            var xScale = d3.time.scale()
+		                .domain([timeInterval.offset(lastDate, -1), lastDate])
+		                .range([0, width - margin.left - margin.right]);
+
+		            // Bind the data to the selection with the lines.
+		            var bars = g.selectAll('line').data(data, value);
+
+		            // Create the bars on enter
+		            bars.enter().append('line')
+		                .attr('x1', function(d) { return xScale(value(d)); })
+		                .attr('x2', function(d) { return xScale(value(d)); })
+		                .attr('y1', 0)
+		                .attr('y2', height - margin.top - margin.bottom)
+		                .attr('stroke', '#000')
+		                .attr('stroke-opacity', 0.5);
+
+		            // Update the scale to use the new dataset.
+		            lastDate = d3.max(data, value);
+		            xScale.domain([timeInterval.offset(lastDate, -1), lastDate]);
+
+		            // Update the position of the bars.
+		            bars.transition()
+		                .duration(300)
+		                .attr('x1', function(d) { return xScale(value(d)); })
+		                .attr('x2', function(d) { return xScale(value(d)); });
+
+		            // Remove the exiting bars.
+		            bars.exit().transition()
+		                .duration(300)
+		                .attr('stroke-opacity', 0)
+		                .remove();
+		        });
+		    }
+
+		    // SVG Initialization Method
+		    chart.svgInit = function(svg) {
+
+		        // Set the SVG size.
+		        svg
+		            .attr('width', width)
+		            .attr('height', height);
+
+		        // Append a container group and translate it to consider the margins.
+		        var g = svg.append('g')
+		            .attr('class', 'chart-content')
+		            .attr('transform', 'translate(' + [margin.top, margin.left] + ')');
+
+		        // Append a white background rectangle.
+		        g.append('rect')
+		            .attr('width', width - margin.left - margin.right)
+		            .attr('height', height - margin.top - margin.bottom)
+		            .attr('fill', 'white');
+		    };
+
+		    // Accessor Methods
+
+		    // Width Accessor
+		    chart.width = function(value) {
+		        if (!arguments.length) { return width; }
+		        width = value;
+		        return chart;
+		    };
+
+		    // Height Accessor
+		    chart.height = function(value) {
+		        if (!arguments.length) { return height; }
+		        height = value;
+		        return chart;
+		    };
+
+		    // Margin Accessor
+		    chart.margin = function(value) {
+		        if (!arguments.length) { return margin; }
+		        margin = value;
+		        return chart;
+		    };
+
+		    // Date Accessor
+		    chart.value = function(accessorFunction) {
+		        if (!arguments.length) { return value; }
+		        value = accessorFunction;
+		        return chart;
+		    };
+
+		    // Time Interval Accessor
+		    chart.timeInterval = function(value) {
+		        if (!arguments.length) { return timeInterval; }
+		        timeInterval = value;
+		        return chart;
+		    };
+
+		    return chart;
 		};
-		
-		// Get the charting function and set the date accessor function.
-		var barcode05 = barcodeChart5()
-			.value(function(d) { return d.date; });
-	
-		// Create the selection, bind the data and call the chart.
-		d3.select('#chart').selectAll('div.data-item')
-			.data([data])
-			.enter()
-			.append('div')
-			.attr('class', 'data-item')
-			.call(barcode05);		
+
+
+
+        
+		// Barcode Chart Configuration
+	    // ---------------------------
+
+	    // Create and configure an instance of the barcode chart.
+	    var barcode = barcodeChart()
+	        .width(480)
+	        .height(25)
+	        .margin({top: 1, right: 1, bottom: 1, left: 1});
+
+	    // Table Structure
+	    // ---------------
+
+	    // Create a table element.
+	    var table = d3.select('#chart').selectAll('table')
+	        .data([data])
+	        .enter()
+	        .append('table')
+	        .attr('class', 'table table-condensed');
+
+	    // Append the table header and body.
+	    var tableHead = table.append('thead'),
+	        tableBody = table.append('tbody');
+
+	    // Add the table header content.
+	    tableHead.append('tr').selectAll('th')
+	        .data(['Name', 'Today Mentions', 'mentions/hour'])
+	        .enter()
+	        .append('th')
+	        .text(function(d) { return d; });
+
+	    // Table Content
+	    // -------------
+
+	    // Add the table body rows.
+	    var rows = tableBody.selectAll('tr')
+	        .data(data)
+	        .enter()
+	        .append('tr');
+
+	    // Add the stock name cell.
+	    rows.append('td')
+	        .text(function(d) { return d.name; });
+
+	    // Add the barcode chart.
+	    rows.append('td')
+	        .datum(function(d) { return d.mentions; })
+	        .call(barcode);
+
+	    // Add the number of mentions by hour, aligned to the right.
+	    rows.append('td').append('p')
+	        .attr('class', 'pull-right')
+	        .text(function(d) { return d.byHour; });
+
 
 		// Connect up any events to the DOM elements represented in this View.
 		this.bindEvents();
